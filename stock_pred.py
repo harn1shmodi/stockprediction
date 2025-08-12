@@ -64,7 +64,60 @@ plt.style.use('fivethirtyeight')
 
 from datetime import date
 
+import tweepy
+from textblob import TextBlob
+
 today = date.today()
+
+def get_twitter_sentiment(stock_symbol, num_tweets=100):
+    """
+    Fetch recent tweets about the stock and calculate overall sentiment
+    
+    Parameters:
+    - stock_symbol: Stock ticker symbol
+    - num_tweets: Number of tweets to analyze
+    
+    Returns:
+    - Sentiment score (-1 to 1, where -1 is very negative, 1 is very positive)
+    """
+    # Twitter API credentials (you'd need to replace with actual credentials)
+    consumer_key = 'YOUR_CONSUMER_KEY'
+    consumer_secret = 'YOUR_CONSUMER_SECRET'
+    access_token = 'YOUR_ACCESS_TOKEN'
+    access_token_secret = 'YOUR_ACCESS_TOKEN_SECRET'
+    
+    # Authenticate with Twitter
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+    api = tweepy.API(auth)
+    
+    # Search for tweets about the stock
+    tweets = api.search_tweets(q=f'${stock_symbol} stock', count=num_tweets)
+    
+    # Calculate sentiment
+    sentiments = []
+    for tweet in tweets:
+        # Use TextBlob for simple sentiment analysis
+        analysis = TextBlob(tweet.text)
+        sentiments.append(analysis.sentiment.polarity)
+    
+    # Return average sentiment
+    return sum(sentiments) / len(sentiments) if sentiments else 0
+
+def adjust_prediction_with_sentiment(original_prediction, sentiment_score):
+    """
+    Adjust stock price prediction based on sentiment score
+    
+    Parameters:
+    - original_prediction: The machine learning model's predicted price
+    - sentiment_score: Twitter sentiment score (-1 to 1)
+    
+    Returns:
+    - Adjusted prediction
+    """
+    # Simple adjustment: Modify prediction by up to 5% based on sentiment
+    adjustment_factor = 1 + (sentiment_score * 0.05)
+    return original_prediction * adjustment_factor
 
 df = web.DataReader(stock , data_source='yahoo', start='2016-01-01', end=str(today))
 
@@ -146,6 +199,8 @@ x_test = np.array(X_test)
 x_test = np.reshape(x_test, (x_test.shape[0],x_test.shape[1],1))
 predictions = model.predict(X_test) 
 predictions = scaler.inverse_transform(predictions)
+sentiment = get_twitter_sentiment(stock)
+predictions = adjust_prediction_with_sentiment(predictions, sentiment)
 #testScore = math.sqrt(mean_squared_error(y_test, predictions))
 #print('RMSE Score: %.2f RMSE' % (testScore))
 
